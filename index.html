@@ -24,44 +24,81 @@
 
 <body>
     <h2>Ghi chú bằng hình ảnh với Fabric.js</h2>
+
     <input type="file" id="uploadImage" accept="image/*">
     <button onclick="removeSelected()">Xóa hình</button>
     <button onclick="saveCanvas()">Lưu ghi chú</button>
-    <div style="display: flex; justify-content: center; align-items: center; padding: 50px;">
+    <button onclick="toggleDrawing()">🖌 Chế độ vẽ</button>
+    <label>🎨 Màu:</label>
+    <input type="color" id="brushColor" value="#ff0000" onchange="changeBrushColor()">
+    <label>✏️ Độ dày:</label>
+    <input type="range" id="brushSize" min="1" max="10" value="3" onchange="changeBrushSize()">
+    <input type="file" id="loadJSON" accept=".json">
+    <button onclick="addText()">➕ Thêm văn bản</button>
+    <button onclick="undo()">⏪ Hoàn tác</button>
+    <button onclick="redo()">⏩ Làm lại</button>
+    <button onclick="saveCanvasAsJSON()">💾 Lưu JSON</button>
 
+    <div style="display: flex; justify-content: center; align-items: center; padding: 20px;">
         <canvas id="canvas" width="1000" height="500"></canvas>
     </div>
 
     <script>
         var canvas = new fabric.Canvas("canvas");
+        var isDrawing = false;
+        var state = [];
+        var index = -1;
 
-        // 🎯 1. Tải hình ảnh lên canvas
+        function saveState() {
+            state = state.slice(0, index + 1);
+            state.push(JSON.stringify(canvas));
+            index = state.length - 1;
+        }
+
+        function undo() {
+            if (index > 0) {
+                index--;
+                canvas.loadFromJSON(state[index], function () {
+                    canvas.renderAll();
+                });
+            }
+        }
+
+        function redo() {
+            if (index < state.length - 1) {
+                index++;
+                canvas.loadFromJSON(state[index], function () {
+                    canvas.renderAll();
+                });
+            }
+        }
+
         document.getElementById("uploadImage").addEventListener("change", function (event) {
             var file = event.target.files[0];
             if (file) {
                 var reader = new FileReader();
                 reader.onload = function (f) {
                     fabric.Image.fromURL(f.target.result, function (img) {
-                        img.scaleToWidth(200); // Giới hạn kích thước ảnh
+                        img.scaleToWidth(200);
                         img.scaleToHeight(200);
                         img.set({ left: 100, top: 100, selectable: true });
                         canvas.add(img);
                         canvas.setActiveObject(img);
+                        saveState();
                     });
                 };
                 reader.readAsDataURL(file);
             }
         });
 
-        // 🎯 2. Xóa hình ảnh đang chọn
         function removeSelected() {
             var obj = canvas.getActiveObject();
             if (obj) {
                 canvas.remove(obj);
+                saveState();
             }
         }
 
-        // 🎯 3. Lưu ghi chú dưới dạng ảnh
         function saveCanvas() {
             var dataURL = canvas.toDataURL({ format: 'png' });
             var link = document.createElement('a');
@@ -69,6 +106,59 @@
             link.download = 'ghi_chu.png';
             link.click();
         }
+
+        function toggleDrawing() {
+            isDrawing = !isDrawing;
+            canvas.isDrawingMode = isDrawing;
+            document.querySelector("button[onclick='toggleDrawing()']").textContent = isDrawing ? "✏️ Đang vẽ (Bấm để tắt)" : "🖌 Chế độ vẽ";
+        }
+
+        function changeBrushColor() {
+            canvas.freeDrawingBrush.color = document.getElementById("brushColor").value;
+        }
+
+        function changeBrushSize() {
+            canvas.freeDrawingBrush.width = parseInt(document.getElementById("brushSize").value, 10);
+        }
+
+        function addText() {
+            var text = new fabric.IText('Nhập văn bản', {
+                left: 200,
+                top: 200,
+                fontSize: 20,
+                fill: '#000000',
+                selectable: true
+            });
+            canvas.add(text);
+            canvas.setActiveObject(text);
+            saveState();
+        }
+
+        function saveCanvasAsJSON() {
+            var json = JSON.stringify(canvas.toJSON());
+            var blob = new Blob([json], { type: "application/json" });
+            var link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'canvas_state.json';
+            link.click();
+        }
+
+        document.getElementById("loadJSON").addEventListener("change", function (event) {
+            var file = event.target.files[0];
+            if (file) {
+                var reader = new FileReader();
+                reader.onload = function (e) {
+                    canvas.loadFromJSON(e.target.result, function () {
+                        canvas.renderAll();
+                    });
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        canvas.on('object:added', saveState);
+        canvas.on('object:modified', saveState);
+        canvas.on('object:removed', saveState);
     </script>
 </body>
 
