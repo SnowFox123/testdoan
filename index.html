@@ -4,52 +4,154 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bản vẽ bằng hình ảnh</title>
+    <title>Canva Mini</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
     <style>
         body {
-            text-align: center;
+            margin: 0;
             font-family: Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background-color: #ffffff;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e5e7eb;
+            box-shadow: 0 1px 5px rgba(0, 0, 0, 0.05);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        #logo {
+            font-weight: bold;
+            font-size: 20px;
+            color: #3b82f6;
+        }
+
+        #toolbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        #toolbar button,
+        #toolbar input[type="file"] {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: none;
+            background: #f3f4f6;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        #toolbar button:hover {
+            background: #e5e7eb;
+        }
+
+        #main {
+            flex: 1;
+            display: flex;
+            background: #f9fafb;
+            overflow: hidden;
+        }
+
+        #sidebar {
+            width: 250px;
+            background-color: #ffffff;
+            border-right: 1px solid #e5e7eb;
+            display: flex;
+            flex-direction: column;
+            padding: 20px 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.03);
+            gap: 15px;
+        }
+
+        #sidebar h3 {
+            font-size: 16px;
+        }
+
+        #sidebar .section {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        #sidebar button,
+        #sidebar input[type="file"],
+        #sidebar input[type="color"],
+        #sidebar input[type="range"] {
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: none;
+            background: #f3f4f6;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        #sidebar button:hover {
+            background: #e5e7eb;
+        }
+
+        #canvas-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #f3f4f6;
         }
 
         canvas {
-            border: 2px solid black;
-        }
-
-        #controls {
-            margin: 10px;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e5e7eb;
         }
     </style>
 </head>
 
 <body>
-    <h2>Bản vẽ với Fabric.js</h2>
-
-    <input type="file" id="uploadImage" accept="image/*">
-    <button onclick="removeSelected()">Xóa hình</button>
-    <button onclick="saveCanvas()">Lưu ghi chú</button>
-    <button onclick="toggleDrawing()">🖌 Chế độ vẽ</button>
-    <label>🎨 Màu:</label>
-    <input type="color" id="brushColor" value="#ff0000" onchange="changeBrushColor()">
-    <label>✏️ Độ dày:</label>
-    <input type="range" id="brushSize" min="1" max="10" value="3" onchange="changeBrushSize()">
-    <input type="file" id="loadJSON" accept=".json">
-    <button onclick="addText()">➕ Thêm văn bản</button>
-    <button onclick="undo()">⏪ Hoàn tác</button>
-    <button onclick="redo()">⏩ Làm lại</button>
-    <button onclick="saveCanvasAsJSON()">💾 Lưu JSON</button>
-
-    <div style="display: flex; justify-content: center; align-items: center; padding: 20px;">
-        <canvas id="canvas" width="1000" height="500"></canvas>
+    <header>
+        <div id="logo">🎨 Canva Mini</div>
+        <div id="toolbar">
+            <button onclick="undo()">⏪ Undo</button>
+            <button onclick="redo()">⏩ Redo</button>
+            <button onclick="saveCanvas()">💾 PNG</button>
+            <button onclick="saveCanvasAsJSON()">📄 JSON</button>
+            <input type="file" id="loadJSON" accept=".json" title="Tải JSON">
+        </div>
+    </header>
+    <div id="main">
+        <div id="sidebar">
+            <h3>Thành phần</h3>
+            <div class="section">
+                <input type="file" id="uploadImage" accept="image/*" title="Tải ảnh">
+                <button onclick="toggleDrawing()">🖌 Bật/Tắt vẽ</button>
+                <input type="color" id="brushColor" value="#ff0000" onchange="changeBrushColor()">
+                <input type="range" id="brushSize" min="1" max="10" value="3" onchange="changeBrushSize()">
+                <button onclick="addText()">T Thêm văn bản</button>
+            </div>
+        </div>
+        <div id="canvas-container">
+            <canvas id="canvas" width="1000" height="600"></canvas>
+        </div>
     </div>
 
     <script>
         var canvas = new fabric.Canvas("canvas");
+        canvas.setBackgroundColor('#ffffff', canvas.renderAll.bind(canvas));
+
         var isDrawing = false;
         var state = [];
         var index = -1;
+        var isRestoring = false;
 
         function saveState() {
+            if (isRestoring) return;
             state = state.slice(0, index + 1);
             state.push(JSON.stringify(canvas));
             index = state.length - 1;
@@ -57,18 +159,22 @@
 
         function undo() {
             if (index > 0) {
+                isRestoring = true;
                 index--;
                 canvas.loadFromJSON(state[index], function () {
                     canvas.renderAll();
+                    isRestoring = false;
                 });
             }
         }
 
         function redo() {
             if (index < state.length - 1) {
+                isRestoring = true;
                 index++;
                 canvas.loadFromJSON(state[index], function () {
                     canvas.renderAll();
+                    isRestoring = false;
                 });
             }
         }
@@ -103,14 +209,13 @@
             var dataURL = canvas.toDataURL({ format: 'png' });
             var link = document.createElement('a');
             link.href = dataURL;
-            link.download = 'ghi_chu.png';
+            link.download = 'canvas.png';
             link.click();
         }
 
         function toggleDrawing() {
             isDrawing = !isDrawing;
             canvas.isDrawingMode = isDrawing;
-            document.querySelector("button[onclick='toggleDrawing()']").textContent = isDrawing ? "✏️ Đang vẽ (Bấm để tắt)" : "🖌 Chế độ vẽ";
         }
 
         function changeBrushColor() {
@@ -148,17 +253,38 @@
             if (file) {
                 var reader = new FileReader();
                 reader.onload = function (e) {
+                    isRestoring = true;
                     canvas.loadFromJSON(e.target.result, function () {
                         canvas.renderAll();
+                        isRestoring = false;
+                        saveState();
                     });
                 };
                 reader.readAsText(file);
             }
         });
 
-        canvas.on('object:added', saveState);
-        canvas.on('object:modified', saveState);
-        canvas.on('object:removed', saveState);
+        canvas.on('mouse:up', function () {
+            if (isDrawing) saveState();
+        });
+
+        canvas.on('object:modified', function () {
+            saveState();
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                removeSelected();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+                e.preventDefault();
+                undo();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+                e.preventDefault();
+                redo();
+            }
+        });
     </script>
 </body>
 
